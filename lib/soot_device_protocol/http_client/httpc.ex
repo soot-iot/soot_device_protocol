@@ -61,28 +61,21 @@ defmodule SootDeviceProtocol.HTTPClient.HTTPC do
     key_pem = Keyword.get(opts, :key_pem)
     trust_pems = Keyword.get(opts, :trust_pems, [])
 
-    cond do
-      is_nil(cert_pem) and is_nil(key_pem) and trust_pems == [] ->
-        []
+    if is_nil(cert_pem) and is_nil(key_pem) and trust_pems == [] do
+      []
+    else
+      cacerts = Enum.flat_map(trust_pems, &decode_cert_chain/1)
 
-      true ->
-        cert_der = decode_cert!(cert_pem)
-        key_entry = decode_key!(key_pem)
-
-        cacerts =
-          trust_pems
-          |> Enum.flat_map(&decode_cert_chain/1)
-
-        [
-          cert: cert_der,
-          key: key_entry,
-          cacerts: cacerts,
-          verify: :verify_peer,
-          server_name_indication: :disable,
-          customize_hostname_check: [
-            match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
-          ]
+      [
+        cert: decode_cert!(cert_pem),
+        key: decode_key!(key_pem),
+        cacerts: cacerts,
+        verify: :verify_peer,
+        server_name_indication: :disable,
+        customize_hostname_check: [
+          match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
         ]
+      ]
     end
   end
 

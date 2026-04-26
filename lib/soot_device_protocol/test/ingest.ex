@@ -62,7 +62,7 @@ defmodule SootDeviceProtocol.Test.Ingest do
 
   @impl true
   def init(opts) do
-    Keyword.fetch!(opts, :agent)
+    _ = Keyword.fetch!(opts, :agent)
     opts
   end
 

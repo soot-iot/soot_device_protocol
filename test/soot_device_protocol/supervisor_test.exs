@@ -2,8 +2,8 @@ defmodule SootDeviceProtocol.SupervisorTest do
   use ExUnit.Case, async: true
 
   alias SootDeviceProtocol.{Commands, Contract, Enrollment, MQTT, Shadow, Telemetry}
-  alias SootDeviceProtocol.Storage.Memory
   alias SootDeviceProtocol.MQTT.Transport.Test, as: TestTransport
+  alias SootDeviceProtocol.Storage.Memory
   alias SootDeviceProtocol.Test.{FakeHTTP, PKI}
 
   @enroll_url "https://example.test/enroll"

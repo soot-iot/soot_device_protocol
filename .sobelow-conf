@@ -1,0 +1,20 @@
+[
+  verbose: false,
+  private: false,
+  skip: false,
+  router: "",
+  exit: "Low",
+  format: "txt",
+  out: "",
+  threshold: "low",
+  # Misc.BinToTerm: Storage.Local persists with term_to_binary and reads
+  #   back with binary_to_term(_, [:safe]). Input comes from the device's
+  #   own filesystem (operator-controlled), not the network, and the
+  #   :safe flag refuses unknown atoms / fun references.
+  ignore: ["Traversal.FileModule", "Misc.BinToTerm"],
+  ignore_files: [],
+  details: nil,
+  all_details: nil,
+  mark_skip_all: nil,
+  clear_skip: nil
+]

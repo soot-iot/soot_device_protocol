@@ -38,6 +38,7 @@ defmodule SootDeviceProtocol.Contract.CanonicalJSONTest do
 
     test "encodes DateTime as ISO8601 string" do
       dt = ~U[2026-04-26 12:00:00Z]
+
       assert CanonicalJSON.encode!(%{"at" => dt}) ==
                ~s({"at":"2026-04-26T12:00:00Z"})
     end
@@ -48,7 +49,12 @@ defmodule SootDeviceProtocol.Contract.CanonicalJSONTest do
     end
 
     test "produces a stable byte-identical output for same input" do
-      payload = %{"version" => 1, "fingerprint" => "abc", "assets" => %{"b.json" => 1, "a.json" => 2}}
+      payload = %{
+        "version" => 1,
+        "fingerprint" => "abc",
+        "assets" => %{"b.json" => 1, "a.json" => 2}
+      }
+
       assert CanonicalJSON.encode!(payload) == CanonicalJSON.encode!(payload)
     end
   end

@@ -77,16 +77,15 @@ defmodule SootDeviceProtocol.Contract.Bundle do
   @spec verify(t(), [String.t()]) :: :ok | {:error, term()}
   def verify(%__MODULE__{} = bundle, trust_pems) when is_list(trust_pems) do
     with :ok <- verify_assets(bundle),
-         :ok <- verify_fingerprint(bundle),
-         :ok <- verify_signature(bundle, trust_pems) do
-      :ok
+         :ok <- verify_fingerprint(bundle) do
+      verify_signature(bundle, trust_pems)
     end
   end
 
   @doc """
   Convenience for callers that have the asset bytes already (e.g. from
-  the `soot_device_test` fixture): build a fully-attached bundle from
-  a manifest map and an `%{path => bytes}` map.
+  the `SootDeviceProtocol.Test.PKI` fixture): build a fully-attached
+  bundle from a manifest map and an `%{path => bytes}` map.
   """
   @spec from_manifest(map(), %{required(String.t()) => binary()}) :: t()
   def from_manifest(manifest, assets) when is_map(manifest) and is_map(assets) do

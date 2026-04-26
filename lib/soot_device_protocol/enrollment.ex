@@ -263,9 +263,8 @@ defmodule SootDeviceProtocol.Enrollment do
 
     with :ok <- Storage.put(storage, :operational_cert_pem, decoded.cert_pem),
          :ok <- Storage.put(storage, :operational_chain_pem, decoded.chain_pem),
-         :ok <- Storage.put(storage, :operational_key_pem, key_pem),
-         :ok <- Storage.put(storage, :device_id, decoded.device_id) do
-      :ok
+         :ok <- Storage.put(storage, :operational_key_pem, key_pem) do
+      Storage.put(storage, :device_id, decoded.device_id)
     end
   end
 

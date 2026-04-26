@@ -150,39 +150,27 @@ defmodule SootDeviceProtocol.Commands.Dispatcher do
   end
 
   defp normalize(cmd) when is_map(cmd) do
-    name = Map.get(cmd, :name) || Map.get(cmd, "name")
-    topic = Map.get(cmd, :topic) || Map.get(cmd, "topic")
-    handler = Map.get(cmd, :handler) || Map.get(cmd, "handler")
+    command = %{
+      name: get(cmd, :name),
+      topic: get(cmd, :topic),
+      handler: get(cmd, :handler),
+      payload_format: get(cmd, :payload_format) || :binary,
+      qos: get(cmd, :qos) || 1
+    }
 
-    payload_format =
-      Map.get(cmd, :payload_format) || Map.get(cmd, "payload_format") || :binary
-
-    qos = Map.get(cmd, :qos) || Map.get(cmd, "qos") || 1
-
-    cond do
-      not is_binary(name) ->
-        {:error, :missing_name}
-
-      not is_binary(topic) ->
-        {:error, :missing_topic}
-
-      not is_function(handler, 2) ->
-        {:error, :missing_handler}
-
-      payload_format not in [:json, :binary, :empty] ->
-        {:error, :invalid_payload_format}
-
-      true ->
-        {:ok,
-         %{
-           name: name,
-           topic: topic,
-           payload_format: payload_format,
-           qos: qos,
-           handler: handler
-         }}
-    end
+    validate(command)
   end
+
+  defp get(cmd, key), do: Map.get(cmd, key) || Map.get(cmd, Atom.to_string(key))
+
+  defp validate(%{name: n}) when not is_binary(n), do: {:error, :missing_name}
+  defp validate(%{topic: t}) when not is_binary(t), do: {:error, :missing_topic}
+  defp validate(%{handler: h}) when not is_function(h, 2), do: {:error, :missing_handler}
+
+  defp validate(%{payload_format: f}) when f not in [:json, :binary, :empty],
+    do: {:error, :invalid_payload_format}
+
+  defp validate(command), do: {:ok, command}
 
   defp subscribe(client, %{name: name, topic: topic, qos: qos}) do
     me = self()
@@ -217,29 +205,27 @@ defmodule SootDeviceProtocol.Commands.Dispatcher do
   defp validate_payload(:empty, _other), do: {:error, :unexpected_payload}
 
   defp invoke_handler(state, command, msg, payload, meta) do
-    try do
-      case command.handler.(payload, meta) do
-        :ok ->
-          :ok
+    case command.handler.(payload, meta) do
+      :ok ->
+        :ok
 
-        {:reply, body} when is_binary(body) ->
-          publish_reply(state, msg, body, [])
+      {:reply, body} when is_binary(body) ->
+        publish_reply(state, msg, body, [])
 
-        {:reply, body, opts} when is_binary(body) and is_list(opts) ->
-          publish_reply(state, msg, body, opts)
+      {:reply, body, opts} when is_binary(body) and is_list(opts) ->
+        publish_reply(state, msg, body, opts)
 
-        {:error, reason} ->
-          Logger.warning("command #{command.name} handler error: #{inspect(reason)}")
-          publish_reply(state, msg, error_body(reason), content_type: "application/json")
+      {:error, reason} ->
+        Logger.warning("command #{command.name} handler error: #{inspect(reason)}")
+        publish_reply(state, msg, error_body(reason), content_type: "application/json")
 
-        other ->
-          Logger.warning("command #{command.name} handler returned unexpected #{inspect(other)}")
-      end
-    rescue
-      error ->
-        Logger.error("command #{command.name} handler raised: #{inspect(error)}")
-        publish_reply(state, msg, error_body(:handler_crashed), content_type: "application/json")
+      other ->
+        Logger.warning("command #{command.name} handler returned unexpected #{inspect(other)}")
     end
+  rescue
+    error ->
+      Logger.error("command #{command.name} handler raised: #{inspect(error)}")
+      publish_reply(state, msg, error_body(:handler_crashed), content_type: "application/json")
   end
 
   defp publish_reply(_state, %Message{response_topic: nil}, _body, _opts), do: :ok
