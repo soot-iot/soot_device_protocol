@@ -41,8 +41,8 @@ defmodule SootDeviceProtocol.Contract.Refresh do
   use GenServer
   require Logger
 
-  alias SootDeviceProtocol.Contract.Bundle
   alias SootDeviceProtocol.{Backoff, Events, HTTPClient, Storage}
+  alias SootDeviceProtocol.Contract.Bundle
 
   @default_interval_ms 300_000
 
@@ -166,12 +166,10 @@ defmodule SootDeviceProtocol.Contract.Refresh do
   defp attempt_refresh(%State{} = state) do
     with {:ok, manifest_json} <- fetch_manifest(state),
          {:ok, %Bundle{} = bundle} <- Bundle.parse_manifest(manifest_json) do
-      cond do
-        bundle.fingerprint == state.current_fingerprint ->
-          {:ok, :unchanged}
-
-        true ->
-          attempt_apply_bundle(state, bundle)
+      if bundle.fingerprint == state.current_fingerprint do
+        {:ok, :unchanged}
+      else
+        attempt_apply_bundle(state, bundle)
       end
     else
       {:error, _} = err ->
@@ -185,7 +183,9 @@ defmodule SootDeviceProtocol.Contract.Refresh do
       {:ok, bundle} ->
         case Bundle.verify(bundle, state.trust_pems) do
           :ok -> {:ok, :updated, bundle}
-          {:error, _} = err -> log_failure(:verify, err); err
+          {:error, _} = err ->
+            log_failure(:verify, err)
+            err
         end
 
       {:error, _} = err ->

@@ -1,7 +1,7 @@
 defmodule SootDeviceProtocol.EnrollmentRetryTest do
   use ExUnit.Case, async: true
 
-  alias SootDeviceProtocol.{Enrollment, Storage}
+  alias SootDeviceProtocol.Enrollment
   alias SootDeviceProtocol.Storage.Memory
   alias SootDeviceProtocol.Test.{FakeHTTP, PKI}
 
