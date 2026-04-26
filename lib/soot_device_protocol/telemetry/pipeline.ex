@@ -265,32 +265,33 @@ defmodule SootDeviceProtocol.Telemetry.Pipeline do
       :empty ->
         {:empty, state}
 
-      {:ok, %{body: body, content_type: ct, min_seq: min_seq, max_seq: max_seq, rows: rows}} ->
+      {:ok, snapshot} ->
         Events.span(
           [:soot_device, :pipeline, :flush],
-          %{stream: name, rows: rows},
-          fn ->
-            case post_batch(state, stream, body, ct, min_seq, max_seq) do
-              :ok ->
-                :ok = state.buffer_mod.drop(state.buffer, name, max_seq)
-
-                stream = %{stream | backoff_ms: nil, retry_after: nil}
-
-                {{:ok, rows, max_seq}, %{state | streams: Map.put(state.streams, name, stream)}}
-
-              {:drop_and_refresh, reason} ->
-                :ok = state.buffer_mod.drop(state.buffer, name, max_seq)
-                invoke_refresh(state)
-                stream = %{stream | backoff_ms: nil, retry_after: nil}
-
-                {{:dropped, reason}, %{state | streams: Map.put(state.streams, name, stream)}}
-
-              {:keep_with_backoff, reason} ->
-                stream = bump_backoff(stream, state)
-                {{:retry, reason}, %{state | streams: Map.put(state.streams, name, stream)}}
-            end
-          end
+          %{stream: name, rows: snapshot.rows},
+          fn -> handle_snapshot_result(state, name, stream, snapshot) end
         )
+    end
+  end
+
+  defp handle_snapshot_result(state, name, stream, snapshot) do
+    %{body: body, content_type: ct, min_seq: min_seq, max_seq: max_seq, rows: rows} = snapshot
+
+    case post_batch(state, stream, body, ct, min_seq, max_seq) do
+      :ok ->
+        :ok = state.buffer_mod.drop(state.buffer, name, max_seq)
+        stream = %{stream | backoff_ms: nil, retry_after: nil}
+        {{:ok, rows, max_seq}, %{state | streams: Map.put(state.streams, name, stream)}}
+
+      {:drop_and_refresh, reason} ->
+        :ok = state.buffer_mod.drop(state.buffer, name, max_seq)
+        invoke_refresh(state)
+        stream = %{stream | backoff_ms: nil, retry_after: nil}
+        {{:dropped, reason}, %{state | streams: Map.put(state.streams, name, stream)}}
+
+      {:keep_with_backoff, reason} ->
+        stream = bump_backoff(stream, state)
+        {{:retry, reason}, %{state | streams: Map.put(state.streams, name, stream)}}
     end
   end
 
@@ -312,20 +313,21 @@ defmodule SootDeviceProtocol.Telemetry.Pipeline do
     end
   end
 
-  defp maybe_define_schema(%State{buffer_mod: mod, buffer: handle}, name, config) do
+  defp maybe_define_schema(%State{} = state, name, config) do
     case Map.get(config, :schema) do
-      nil ->
-        :ok
+      nil -> :ok
+      schema when is_list(schema) -> define_schema(state, name, schema)
+    end
+  end
 
-      schema when is_list(schema) ->
-        if function_exported?(mod, :define, 3) do
-          case mod.define(handle, name, schema) do
-            :ok -> :ok
-            {:error, _} = err -> raise "buffer rejected schema for #{name}: #{inspect(err)}"
-          end
-        else
-          :ok
-        end
+  defp define_schema(%State{buffer_mod: mod, buffer: handle}, name, schema) do
+    if function_exported?(mod, :define, 3) do
+      case mod.define(handle, name, schema) do
+        :ok -> :ok
+        {:error, _} = err -> raise "buffer rejected schema for #{name}: #{inspect(err)}"
+      end
+    else
+      :ok
     end
   end
 
