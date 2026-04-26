@@ -56,3 +56,25 @@ Supervisor.start_link(children, strategy: :one_for_one, name: MyApp.Supervisor)
 ```
 
 See `DEVICE-SPEC.md` in the [`soot`](../soot) repo for the full architecture.
+
+## Installer
+
+For a brand-new Nerves project, the installer scaffolds the supervision
+wiring and a config helper:
+
+```bash
+mix nerves.new my_device --target qemu_aarch64
+cd my_device
+# add {:soot_device_protocol, "~> 0.1"} (or `path:`) to deps, then:
+mix deps.get
+mix soot_device_protocol.install --yes
+```
+
+This generates a `<App>.SootDeviceConfig` helper that reads runtime
+config from `:my_device` Application env, adds
+`{SootDeviceProtocol.Supervisor, MyDevice.SootDeviceConfig.protocol_opts()}`
+to your supervision tree, and seeds `config/config.exs` with
+env-overridable placeholders for the URLs, serial, and storage paths.
+
+For the higher-level declarative DSL, use `mix igniter.install soot_device`
+instead — the two installers are alternatives.
