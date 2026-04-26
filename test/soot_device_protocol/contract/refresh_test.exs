@@ -109,7 +109,12 @@ defmodule SootDeviceProtocol.Contract.RefreshTest do
   end
 
   defp stub_bundle(http, fixture) do
-    FakeHTTP.stub(http, :get, @url, {200, [{"content-type", "application/json"}], fixture.manifest_json})
+    FakeHTTP.stub(
+      http,
+      :get,
+      @url,
+      {200, [{"content-type", "application/json"}], fixture.manifest_json}
+    )
 
     Enum.each(fixture.assets, fn {path, body} ->
       url = @url <> "/" <> fixture.fingerprint <> "/" <> path

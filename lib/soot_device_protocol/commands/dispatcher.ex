@@ -160,10 +160,18 @@ defmodule SootDeviceProtocol.Commands.Dispatcher do
     qos = Map.get(cmd, :qos) || Map.get(cmd, "qos") || 1
 
     cond do
-      not is_binary(name) -> {:error, :missing_name}
-      not is_binary(topic) -> {:error, :missing_topic}
-      not is_function(handler, 2) -> {:error, :missing_handler}
-      payload_format not in [:json, :binary, :empty] -> {:error, :invalid_payload_format}
+      not is_binary(name) ->
+        {:error, :missing_name}
+
+      not is_binary(topic) ->
+        {:error, :missing_topic}
+
+      not is_function(handler, 2) ->
+        {:error, :missing_handler}
+
+      payload_format not in [:json, :binary, :empty] ->
+        {:error, :invalid_payload_format}
+
       true ->
         {:ok,
          %{
@@ -192,7 +200,7 @@ defmodule SootDeviceProtocol.Commands.Dispatcher do
 
       {:error, reason} ->
         Logger.warning("command #{command.name} rejected: #{inspect(reason)}")
-        publish_reply(state, msg, error_body(reason), [content_type: "application/json"])
+        publish_reply(state, msg, error_body(reason), content_type: "application/json")
     end
   end
 

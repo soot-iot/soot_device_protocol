@@ -76,8 +76,12 @@ defmodule SootDeviceProtocol.Telemetry.PipelineTest do
   end
 
   test "409 fingerprint mismatch drops the rows and triggers contract refresh", ctx do
-    FakeHTTP.stub(ctx.http, :post, @base_url <> "/ingest/vibration",
-      {409, [], Jason.encode!(%{error: "fingerprint_mismatch"})})
+    FakeHTTP.stub(
+      ctx.http,
+      :post,
+      @base_url <> "/ingest/vibration",
+      {409, [], Jason.encode!(%{error: "fingerprint_mismatch"})}
+    )
 
     me = self()
     refresh_fun = fn -> send(me, :refresh) end
@@ -93,8 +97,12 @@ defmodule SootDeviceProtocol.Telemetry.PipelineTest do
   end
 
   test "transient errors keep rows and apply backoff", ctx do
-    FakeHTTP.stub(ctx.http, :post, @base_url <> "/ingest/vibration",
-      {503, [], Jason.encode!(%{error: "service_unavailable"})})
+    FakeHTTP.stub(
+      ctx.http,
+      :post,
+      @base_url <> "/ingest/vibration",
+      {503, [], Jason.encode!(%{error: "service_unavailable"})}
+    )
 
     {:ok, pipe} = start_pipeline(ctx, initial_backoff_ms: 100, max_backoff_ms: 200)
     Pipeline.write(pipe, "vibration", %{"x" => 1})

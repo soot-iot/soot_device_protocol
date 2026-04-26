@@ -73,9 +73,16 @@ defmodule SootDeviceProtocol.Enrollment do
 
   @doc "Read the operational identity for downstream components."
   @spec operational_identity(GenServer.server()) ::
-          {:ok, %{cert_pem: String.t(), key_pem: String.t(), chain_pem: String.t(), device_id: String.t()}}
+          {:ok,
+           %{
+             cert_pem: String.t(),
+             key_pem: String.t(),
+             chain_pem: String.t(),
+             device_id: String.t()
+           }}
           | :error
-  def operational_identity(server \\ __MODULE__), do: GenServer.call(server, :operational_identity)
+  def operational_identity(server \\ __MODULE__),
+    do: GenServer.call(server, :operational_identity)
 
   @doc """
   Static helper: read the persisted operational identity straight from
@@ -84,7 +91,13 @@ defmodule SootDeviceProtocol.Enrollment do
   need read-only access to the identity material.
   """
   @spec read_identity(Storage.binding()) ::
-          {:ok, %{cert_pem: String.t(), key_pem: String.t(), chain_pem: String.t(), device_id: String.t()}}
+          {:ok,
+           %{
+             cert_pem: String.t(),
+             key_pem: String.t(),
+             chain_pem: String.t(),
+             device_id: String.t()
+           }}
           | :error
   def read_identity(storage) do
     with {:ok, cert} <- Storage.get(storage, :operational_cert_pem),

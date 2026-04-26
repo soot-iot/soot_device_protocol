@@ -187,6 +187,7 @@ defmodule SootDeviceProtocol.Shadow.SyncTest do
       )
 
     me = self()
+
     Sync.register_handler(sync, :sample_rate, fn value, _meta ->
       send(me, {:rate, value})
       :ok

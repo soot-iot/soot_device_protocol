@@ -100,7 +100,8 @@ defmodule SootDeviceProtocol.HTTPClient.HTTPC do
 
   defp decode_key!(pem) when is_binary(pem) do
     case :public_key.pem_decode(pem) do
-      [{type, der, :not_encrypted} | _] when type in [:ECPrivateKey, :RSAPrivateKey, :PrivateKeyInfo] ->
+      [{type, der, :not_encrypted} | _]
+      when type in [:ECPrivateKey, :RSAPrivateKey, :PrivateKeyInfo] ->
         {type, der}
 
       _ ->

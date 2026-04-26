@@ -201,7 +201,9 @@ defmodule SootDeviceProtocol.Telemetry.Pipeline do
         bytes = approx_size(row)
 
         :ok = state.buffer_mod.append(state.buffer, name, seq, row, bytes)
-        _dropped = state.buffer_mod.prune(state.buffer, state.retention_rows, state.retention_bytes)
+
+        _dropped =
+          state.buffer_mod.prune(state.buffer, state.retention_rows, state.retention_bytes)
 
         stream = %{stream | sequence: seq}
         :ok = persist_sequence(state.storage, name, seq)
@@ -256,7 +258,9 @@ defmodule SootDeviceProtocol.Telemetry.Pipeline do
             :ok = state.buffer_mod.drop(state.buffer, name, seq_end)
 
             stream = %{stream | backoff_ms: nil, retry_after: nil}
-            {{:ok, length(entries), seq_end}, %{state | streams: Map.put(state.streams, name, stream)}}
+
+            {{:ok, length(entries), seq_end},
+             %{state | streams: Map.put(state.streams, name, stream)}}
 
           {:drop_and_refresh, reason} ->
             :ok = state.buffer_mod.drop(state.buffer, name, seq_end)
@@ -267,8 +271,7 @@ defmodule SootDeviceProtocol.Telemetry.Pipeline do
           {:keep_with_backoff, reason} ->
             stream = bump_backoff(stream, state)
 
-            {{:retry, reason},
-             %{state | streams: Map.put(state.streams, name, stream)}}
+            {{:retry, reason}, %{state | streams: Map.put(state.streams, name, stream)}}
         end
     end
   end
@@ -378,8 +381,7 @@ defmodule SootDeviceProtocol.Telemetry.Pipeline do
     %Stream{
       name: name,
       fingerprint: Map.fetch!(config, :fingerprint),
-      ingest_endpoint:
-        Map.get(config, :ingest_endpoint, "/ingest/#{name}"),
+      ingest_endpoint: Map.get(config, :ingest_endpoint, "/ingest/#{name}"),
       descriptor: Map.get(config, :descriptor, %{}),
       sequence: max(persisted, Map.get(config, :sequence, 0))
     }
