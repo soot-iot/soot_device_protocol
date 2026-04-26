@@ -15,7 +15,11 @@ defmodule SootDeviceProtocol.MQTT.ClientTest do
     transport = :sys.get_state(pid).transport
 
     on_exit(fn ->
-      if Process.alive?(pid), do: GenServer.stop(pid)
+      try do
+        GenServer.stop(pid)
+      catch
+        :exit, _ -> :ok
+      end
     end)
 
     %{client: pid, transport: transport}

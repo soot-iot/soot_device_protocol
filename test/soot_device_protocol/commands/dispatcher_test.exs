@@ -10,7 +10,11 @@ defmodule SootDeviceProtocol.Commands.DispatcherTest do
     transport = :sys.get_state(mqtt).transport
 
     on_exit(fn ->
-      if Process.alive?(mqtt), do: GenServer.stop(mqtt)
+      try do
+        GenServer.stop(mqtt)
+      catch
+        :exit, _ -> :ok
+      end
     end)
 
     %{mqtt: mqtt, transport: transport}

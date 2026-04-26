@@ -16,7 +16,11 @@ defmodule SootDeviceProtocol.Shadow.SyncTest do
     {:ok, storage} = Memory.open()
 
     on_exit(fn ->
-      if Process.alive?(mqtt), do: GenServer.stop(mqtt)
+      try do
+        GenServer.stop(mqtt)
+      catch
+        :exit, _ -> :ok
+      end
     end)
 
     %{mqtt: mqtt, transport: transport, storage: storage}
