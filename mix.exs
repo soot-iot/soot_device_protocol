@@ -26,7 +26,6 @@ defmodule SootDeviceProtocol.MixProject do
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp description do
@@ -57,8 +56,11 @@ defmodule SootDeviceProtocol.MixProject do
       # :emqtt transport, so a device that only uses the test transport
       # (or another implementation) need not pull it in.
       {:emqtt, "~> 1.14", optional: true},
+      # Required by the SootDeviceProtocol.Test.Ingest fixture, which
+      # ships in lib/ so downstream tests (soot_device, end-user
+      # device tests) can use it through the path/hex dep.
+      {:plug, "~> 1.19"},
       # Dev / test
-      {:plug, "~> 1.19", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.34", only: [:dev], runtime: false}
     ]
