@@ -17,22 +17,8 @@ jobs:
         include:
           - { elixir: "1.18.4", otp: "28.3" }
 
-    defaults:
-      run:
-        working-directory: soot_device_protocol
-
     steps:
-      # `:duxedo` is consumed via `{:duxedo, path: "../duxedo", optional: true}`
-      # so deps.get / deps.unlock --check-unused need the sibling repo on
-      # disk. Lay both out under their canonical names.
       - uses: actions/checkout@v4
-        with:
-          path: soot_device_protocol
-
-      - uses: actions/checkout@v4
-        with:
-          repository: soot-iot/duxedo
-          path: duxedo
 
       - uses: erlef/setup-beam@v1
         with:
@@ -43,22 +29,26 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            soot_device_protocol/deps
-            soot_device_protocol/_build
-          key: mix-${{ runner.os }}-${{ matrix.elixir }}-${{ matrix.otp }}-${{ hashFiles('soot_device_protocol/mix.lock') }}
+            deps
+            _build
+          key: mix-${{ runner.os }}-${{ matrix.elixir }}-${{ matrix.otp }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
             mix-${{ runner.os }}-${{ matrix.elixir }}-${{ matrix.otp }}-
 
       - name: Restore PLT cache
         uses: actions/cache@v4
         with:
-          path: soot_device_protocol/priv/plts
-          key: plt-${{ runner.os }}-${{ matrix.elixir }}-${{ matrix.otp }}-${{ hashFiles('soot_device_protocol/mix.lock') }}
+          path: priv/plts
+          key: plt-${{ runner.os }}-${{ matrix.elixir }}-${{ matrix.otp }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
             plt-${{ runner.os }}-${{ matrix.elixir }}-${{ matrix.otp }}-
 
+      # `mix deps.unlock --check-unused` is intentionally not run: the
+      # project consumes `{:duxedo, path: "../duxedo", optional: true}`
+      # which CI cannot resolve (private sibling repo, no cross-repo
+      # token), so the check would always flag duxedo's transitive
+      # deps as unused. Lock cleanliness is enforced locally instead.
       - run: mix deps.get
-      - run: mix deps.unlock --check-unused
       - run: mix deps.audit
       - run: mix format --check-formatted
       - run: mix compile --warnings-as-errors
