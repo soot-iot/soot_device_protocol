@@ -1,3 +1,4 @@
+if Code.ensure_loaded?(Duxedo.Streams) do
 defmodule SootDeviceProtocol.Telemetry.Buffer.DuxedoTest do
   use ExUnit.Case, async: false
 
@@ -102,4 +103,5 @@ defmodule SootDeviceProtocol.Telemetry.Buffer.DuxedoTest do
   test "take/3 on undefined stream returns []", %{handle: handle} do
     assert [] = Buffer.take(handle, :nope, 10)
   end
+end
 end
