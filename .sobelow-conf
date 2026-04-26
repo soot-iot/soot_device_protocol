@@ -11,7 +11,10 @@
   #   back with binary_to_term(_, [:safe]). Input comes from the device's
   #   own filesystem (operator-controlled), not the network, and the
   #   :safe flag refuses unknown atoms / fun references.
-  ignore: ["Traversal.FileModule", "Misc.BinToTerm"],
+  # DOS.StringToAtom: Telemetry stream names come from the signed
+  #   contract bundle (verified before any String.to_atom call), not
+  #   arbitrary network input. Bundle authoring is operator-controlled.
+  ignore: ["Traversal.FileModule", "Misc.BinToTerm", "DOS.StringToAtom"],
   ignore_files: [],
   details: nil,
   all_details: nil,
