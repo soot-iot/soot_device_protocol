@@ -14,8 +14,12 @@ defmodule SootDeviceProtocol.Contract.RefreshJitterTest do
     ca = PKI.build_ca("/CN=Refresh Jitter CA")
     fixture = PKI.build_signed_bundle(ca)
 
-    FakeHTTP.stub(http, :get, @url,
-      {200, [{"content-type", "application/json"}], fixture.manifest_json})
+    FakeHTTP.stub(
+      http,
+      :get,
+      @url,
+      {200, [{"content-type", "application/json"}], fixture.manifest_json}
+    )
 
     Enum.each(fixture.assets, fn {path, body} ->
       url = @url <> "/" <> fixture.fingerprint <> "/" <> path
