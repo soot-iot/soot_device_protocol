@@ -22,7 +22,7 @@ defmodule SootDeviceProtocol.MixProject do
 
   def application do
     [
-      extra_applications: [:logger, :public_key, :crypto, :ssl, :inets]
+      extra_applications: [:logger, :ssl, :inets]
     ]
   end
 
