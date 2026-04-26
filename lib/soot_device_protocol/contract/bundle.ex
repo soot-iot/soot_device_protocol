@@ -167,24 +167,10 @@ defmodule SootDeviceProtocol.Contract.Bundle do
     end
   end
 
+  # Walks the raw :public_key PEM entries rather than X509.from_pem/1
+  # because X509 raises on harmless extras like an `EC PARAMETERS`
+  # block; trust chains seen in the wild include them.
   defp public_keys_for_pem(pem) when is_binary(pem) do
-    pem
-    |> X509.from_pem()
-    |> Enum.flat_map(fn
-      {:Certificate, _, _} = entry ->
-        [entry |> :public_key.pkix_decode_cert(:otp) |> X509.Certificate.public_key()]
-
-      cert when is_tuple(cert) and elem(cert, 0) in [:OTPCertificate, :Certificate] ->
-        [X509.Certificate.public_key(cert)]
-
-      _ ->
-        []
-    end)
-  rescue
-    _ -> fallback_public_keys(pem)
-  end
-
-  defp fallback_public_keys(pem) do
     pem
     |> :public_key.pem_decode()
     |> Enum.flat_map(fn

@@ -56,8 +56,7 @@ defmodule SootDeviceProtocol.HTTPClient.HTTPC do
     end
   end
 
-  @doc false
-  def ssl_options(opts) do
+  defp ssl_options(opts) do
     cert_pem = Keyword.get(opts, :cert_pem)
     key_pem = Keyword.get(opts, :key_pem)
     trust_pems = Keyword.get(opts, :trust_pems, [])
