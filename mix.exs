@@ -80,6 +80,10 @@ defmodule SootDeviceProtocol.MixProject do
       # ships in lib/ so downstream tests (soot_device, end-user
       # device tests) can use it through the path/hex dep.
       {:plug, "~> 1.19"},
+      # Optional installer tooling — only loaded when the consumer is
+      # running `mix igniter.install soot_device_protocol`. The runtime
+      # never references Igniter.
+      {:igniter, "~> 0.6", optional: true},
       # Dev / test
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
