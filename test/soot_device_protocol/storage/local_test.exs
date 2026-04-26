@@ -5,7 +5,9 @@ defmodule SootDeviceProtocol.Storage.LocalTest do
   alias SootDeviceProtocol.Storage.Local
 
   setup do
-    root = Path.join(System.tmp_dir!(), "soot-storage-test-#{:erlang.unique_integer([:positive])}")
+    root =
+      Path.join(System.tmp_dir!(), "soot-storage-test-#{:erlang.unique_integer([:positive])}")
+
     on_exit(fn -> File.rm_rf!(root) end)
     {:ok, binding} = Local.open(root)
     %{root: root, binding: binding}

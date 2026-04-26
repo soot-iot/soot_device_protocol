@@ -38,9 +38,9 @@ defmodule SootDeviceProtocol.Storage.Local do
     case File.read(path) do
       {:ok, bin} ->
         try do
-          {:ok, :erlang.binary_to_term(bin)}
+          {:ok, :erlang.binary_to_term(bin, [:safe])}
         rescue
-          _ -> :error
+          ArgumentError -> :error
         end
 
       {:error, :enoent} ->

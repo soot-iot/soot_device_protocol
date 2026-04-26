@@ -10,7 +10,11 @@ defmodule SootDeviceProtocol.Commands.DispatcherTest do
     transport = :sys.get_state(mqtt).transport
 
     on_exit(fn ->
-      if Process.alive?(mqtt), do: GenServer.stop(mqtt)
+      try do
+        GenServer.stop(mqtt)
+      catch
+        :exit, _ -> :ok
+      end
     end)
 
     %{mqtt: mqtt, transport: transport}
@@ -28,7 +32,9 @@ defmodule SootDeviceProtocol.Commands.DispatcherTest do
 
       _ ->
         if System.monotonic_time(:millisecond) >= end_time do
-          flunk("timed out waiting for #{count} publish(es); got #{inspect(TestTransport.published(transport))}")
+          flunk(
+            "timed out waiting for #{count} publish(es); got #{inspect(TestTransport.published(transport))}"
+          )
         else
           Process.sleep(5)
           do_wait_for_publishes(transport, count, end_time)

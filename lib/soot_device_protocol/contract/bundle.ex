@@ -77,16 +77,15 @@ defmodule SootDeviceProtocol.Contract.Bundle do
   @spec verify(t(), [String.t()]) :: :ok | {:error, term()}
   def verify(%__MODULE__{} = bundle, trust_pems) when is_list(trust_pems) do
     with :ok <- verify_assets(bundle),
-         :ok <- verify_fingerprint(bundle),
-         :ok <- verify_signature(bundle, trust_pems) do
-      :ok
+         :ok <- verify_fingerprint(bundle) do
+      verify_signature(bundle, trust_pems)
     end
   end
 
   @doc """
   Convenience for callers that have the asset bytes already (e.g. from
-  the `soot_device_test` fixture): build a fully-attached bundle from
-  a manifest map and an `%{path => bytes}` map.
+  the `SootDeviceProtocol.Test.PKI` fixture): build a fully-attached
+  bundle from a manifest map and an `%{path => bytes}` map.
   """
   @spec from_manifest(map(), %{required(String.t()) => binary()}) :: t()
   def from_manifest(manifest, assets) when is_map(manifest) and is_map(assets) do
@@ -167,24 +166,10 @@ defmodule SootDeviceProtocol.Contract.Bundle do
     end
   end
 
+  # Walks the raw :public_key PEM entries rather than X509.from_pem/1
+  # because X509 raises on harmless extras like an `EC PARAMETERS`
+  # block; trust chains seen in the wild include them.
   defp public_keys_for_pem(pem) when is_binary(pem) do
-    pem
-    |> X509.from_pem()
-    |> Enum.flat_map(fn
-      {:Certificate, _, _} = entry ->
-        [entry |> :public_key.pkix_decode_cert(:otp) |> X509.Certificate.public_key()]
-
-      cert when is_tuple(cert) and elem(cert, 0) in [:OTPCertificate, :Certificate] ->
-        [X509.Certificate.public_key(cert)]
-
-      _ ->
-        []
-    end)
-  rescue
-    _ -> fallback_public_keys(pem)
-  end
-
-  defp fallback_public_keys(pem) do
     pem
     |> :public_key.pem_decode()
     |> Enum.flat_map(fn

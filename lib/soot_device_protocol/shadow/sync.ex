@@ -240,10 +240,20 @@ defmodule SootDeviceProtocol.Shadow.Sync do
     delta_handler = fn msg -> send(me, {:shadow_inbound, :delta, msg}) end
 
     :ok =
-      MQTT.Client.subscribe(state.mqtt_client, state.base_topic <> "/desired", state.qos, desired_handler)
+      MQTT.Client.subscribe(
+        state.mqtt_client,
+        state.base_topic <> "/desired",
+        state.qos,
+        desired_handler
+      )
 
     :ok =
-      MQTT.Client.subscribe(state.mqtt_client, state.base_topic <> "/delta", state.qos, delta_handler)
+      MQTT.Client.subscribe(
+        state.mqtt_client,
+        state.base_topic <> "/delta",
+        state.qos,
+        delta_handler
+      )
 
     :ok
   end

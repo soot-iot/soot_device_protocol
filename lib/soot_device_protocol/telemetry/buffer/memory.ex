@@ -107,13 +107,11 @@ defmodule SootDeviceProtocol.Telemetry.Buffer.Memory do
     |> :ets.tab2list()
     |> Enum.sort_by(fn {_key, _row, _bytes, inserted_at} -> inserted_at end)
     |> Enum.reduce_while({0, 0}, fn {key, _row, b, _ts}, {drops, dropped_bytes} ->
-      cond do
-        drops >= target_rows and dropped_bytes >= target_bytes ->
-          {:halt, {drops, dropped_bytes}}
-
-        true ->
-          :ets.delete(table, key)
-          {:cont, {drops + 1, dropped_bytes + b}}
+      if drops >= target_rows and dropped_bytes >= target_bytes do
+        {:halt, {drops, dropped_bytes}}
+      else
+        :ets.delete(table, key)
+        {:cont, {drops + 1, dropped_bytes + b}}
       end
     end)
     |> elem(0)

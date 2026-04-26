@@ -15,7 +15,11 @@ defmodule SootDeviceProtocol.MQTT.ClientTest do
     transport = :sys.get_state(pid).transport
 
     on_exit(fn ->
-      if Process.alive?(pid), do: GenServer.stop(pid)
+      try do
+        GenServer.stop(pid)
+      catch
+        :exit, _ -> :ok
+      end
     end)
 
     %{client: pid, transport: transport}
@@ -23,16 +27,24 @@ defmodule SootDeviceProtocol.MQTT.ClientTest do
 
   test "publish/4 forwards through the transport", %{client: client, transport: transport} do
     Client.publish(client, "tenants/acme/devices/d1/reported", "hello", qos: 1)
+
     [%Message{topic: "tenants/acme/devices/d1/reported", payload: "hello", qos: 1}] =
       TestTransport.published(transport)
   end
 
-  test "subscribe/4 records the filter and routes inbound messages", %{client: client, transport: transport} do
+  test "subscribe/4 records the filter and routes inbound messages", %{
+    client: client,
+    transport: transport
+  } do
     me = self()
     handler = fn msg -> send(me, {:got, msg.topic, msg.payload}) end
 
     :ok = Client.subscribe(client, "tenants/+/devices/+/cmd/reboot", 1, handler)
-    assert MapSet.member?(TestTransport.subscriptions(transport), "tenants/+/devices/+/cmd/reboot")
+
+    assert MapSet.member?(
+             TestTransport.subscriptions(transport),
+             "tenants/+/devices/+/cmd/reboot"
+           )
 
     TestTransport.deliver(
       transport,

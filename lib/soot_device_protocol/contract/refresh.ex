@@ -41,8 +41,8 @@ defmodule SootDeviceProtocol.Contract.Refresh do
   use GenServer
   require Logger
 
-  alias SootDeviceProtocol.{Backoff, Events, HTTPClient, Storage}
   alias SootDeviceProtocol.Contract.Bundle
+  alias SootDeviceProtocol.{Backoff, Events, HTTPClient, Storage}
 
   @default_interval_ms 300_000
 
@@ -277,13 +277,11 @@ defmodule SootDeviceProtocol.Contract.Refresh do
   defp invoke_on_change(nil, _bundle), do: :ok
 
   defp invoke_on_change(fun, bundle) when is_function(fun, 1) do
-    try do
-      fun.(bundle)
-    rescue
-      error ->
-        Logger.error("soot_device_protocol on_change callback raised: #{inspect(error)}")
-        :ok
-    end
+    fun.(bundle)
+  rescue
+    error ->
+      Logger.error("soot_device_protocol on_change callback raised: #{inspect(error)}")
+      :ok
   end
 
   defp reschedule(%State{} = state, result) do

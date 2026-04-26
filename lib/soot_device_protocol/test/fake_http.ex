@@ -30,7 +30,15 @@ defmodule SootDeviceProtocol.Test.FakeHTTP do
     Agent.update(agent, fn state ->
       Map.update!(state, :requests, fn list ->
         list ++
-          [%{method: method, url: url, headers: headers, body: body, opts: Keyword.delete(opts, :agent)}]
+          [
+            %{
+              method: method,
+              url: url,
+              headers: headers,
+              body: body,
+              opts: Keyword.delete(opts, :agent)
+            }
+          ]
       end)
     end)
 
