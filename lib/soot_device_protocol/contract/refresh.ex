@@ -114,7 +114,12 @@ defmodule SootDeviceProtocol.Contract.Refresh do
       failure_backoff:
         Backoff.new(
           initial: Keyword.get(opts, :initial_backoff_ms, 1_000),
-          max: Keyword.get(opts, :max_backoff_ms, Keyword.get(opts, :interval_ms, @default_interval_ms))
+          max:
+            Keyword.get(
+              opts,
+              :max_backoff_ms,
+              Keyword.get(opts, :interval_ms, @default_interval_ms)
+            )
         )
     }
 
@@ -182,7 +187,9 @@ defmodule SootDeviceProtocol.Contract.Refresh do
     case fetch_assets(state, bundle) do
       {:ok, bundle} ->
         case Bundle.verify(bundle, state.trust_pems) do
-          :ok -> {:ok, :updated, bundle}
+          :ok ->
+            {:ok, :updated, bundle}
+
           {:error, _} = err ->
             log_failure(:verify, err)
             err

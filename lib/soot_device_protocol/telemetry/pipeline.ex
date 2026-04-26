@@ -276,16 +276,14 @@ defmodule SootDeviceProtocol.Telemetry.Pipeline do
 
                 stream = %{stream | backoff_ms: nil, retry_after: nil}
 
-                {{:ok, rows, max_seq},
-                 %{state | streams: Map.put(state.streams, name, stream)}}
+                {{:ok, rows, max_seq}, %{state | streams: Map.put(state.streams, name, stream)}}
 
               {:drop_and_refresh, reason} ->
                 :ok = state.buffer_mod.drop(state.buffer, name, max_seq)
                 invoke_refresh(state)
                 stream = %{stream | backoff_ms: nil, retry_after: nil}
 
-                {{:dropped, reason},
-                 %{state | streams: Map.put(state.streams, name, stream)}}
+                {{:dropped, reason}, %{state | streams: Map.put(state.streams, name, stream)}}
 
               {:keep_with_backoff, reason} ->
                 stream = bump_backoff(stream, state)
@@ -338,7 +336,9 @@ defmodule SootDeviceProtocol.Telemetry.Pipeline do
       :ok ->
         :ok = state.buffer_mod.drop(state.buffer, name, seq_end)
         stream = %{stream | backoff_ms: nil, retry_after: nil}
-        {{:ok, length(entries), seq_end}, %{state | streams: Map.put(state.streams, name, stream)}}
+
+        {{:ok, length(entries), seq_end},
+         %{state | streams: Map.put(state.streams, name, stream)}}
 
       {:drop_and_refresh, reason} ->
         :ok = state.buffer_mod.drop(state.buffer, name, seq_end)

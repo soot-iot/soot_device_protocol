@@ -42,6 +42,7 @@ defmodule SootDeviceProtocol.MQTT.EventsTest do
 
   test "publish emits :publish with bytes + topic", %{client: client} do
     Client.publish(client, "topic/x", "hello")
+
     assert_receive {:event, [:soot_device, :mqtt, :publish], %{bytes: 5},
                     %{topic: "topic/x", qos: 1}}
   end
