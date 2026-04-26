@@ -72,6 +72,10 @@ defmodule SootDeviceProtocol.MixProject do
       # :emqtt transport, so a device that only uses the test transport
       # (or another implementation) need not pull it in.
       {:emqtt, "~> 1.14", optional: true},
+      # Optional Duxedo backend for Telemetry.Buffer. Pulled in only
+      # when the operator wants the production DuckDB+Arrow path; the
+      # default Buffer.Memory has no NIF deps.
+      {:duxedo, path: "../duxedo", optional: true},
       # Required by the SootDeviceProtocol.Test.Ingest fixture, which
       # ships in lib/ so downstream tests (soot_device, end-user
       # device tests) can use it through the path/hex dep.

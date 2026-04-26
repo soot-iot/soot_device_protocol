@@ -47,4 +47,33 @@ defmodule SootDeviceProtocol.Telemetry.Buffer do
   """
   @callback prune(handle(), max_rows :: non_neg_integer(), max_bytes :: non_neg_integer()) ::
               non_neg_integer()
+
+  @doc """
+  Optional. Declare a stream's typed schema. Buffers that need the
+  shape up-front (e.g. `Buffer.Duxedo`) implement this; buffers that
+  store rows opaquely (e.g. `Buffer.Memory`) ignore it.
+  """
+  @callback define(handle(), stream(), columns :: term()) :: :ok | {:error, term()}
+
+  @doc """
+  Optional. Pull the next batch as a server-shaped payload (e.g.
+  Arrow IPC), bypassing the row-by-row encoder.
+
+  Buffers that can produce a wire-ready batch directly implement
+  this; the pipeline checks `function_exported?(buffer_mod,
+  :snapshot_for_upload, 3)` and prefers it over `take/3` + encoder
+  when available.
+  """
+  @callback snapshot_for_upload(handle(), stream(), max_rows :: pos_integer()) ::
+              {:ok,
+               %{
+                 body: binary(),
+                 content_type: String.t(),
+                 min_seq: integer(),
+                 max_seq: integer(),
+                 rows: integer()
+               }}
+              | :empty
+
+  @optional_callbacks define: 3, snapshot_for_upload: 3
 end
