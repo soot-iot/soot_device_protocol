@@ -53,7 +53,7 @@ defmodule SootDeviceProtocol.Telemetry.Pipeline do
   use GenServer
   require Logger
 
-  alias SootDeviceProtocol.{HTTPClient, Storage}
+  alias SootDeviceProtocol.{Events, HTTPClient, Storage}
   alias SootDeviceProtocol.Telemetry.{Buffer, Encoder}
 
   @default_retention_rows 1_000_000
@@ -206,6 +206,12 @@ defmodule SootDeviceProtocol.Telemetry.Pipeline do
         stream = %{stream | sequence: seq}
         :ok = persist_sequence(state.storage, name, seq)
 
+        Events.emit(
+          [:soot_device, :pipeline, :write],
+          %{bytes: bytes},
+          %{stream: name, seq: seq}
+        )
+
         {:reply, {:ok, seq}, %{state | streams: Map.put(state.streams, name, stream)}}
     end
   end
@@ -251,25 +257,32 @@ defmodule SootDeviceProtocol.Telemetry.Pipeline do
         seq_start = entries |> List.first() |> Map.fetch!(:seq)
         seq_end = entries |> List.last() |> Map.fetch!(:seq)
 
-        case encode_and_post(state, stream, rows, seq_start, seq_end) do
-          :ok ->
-            :ok = state.buffer_mod.drop(state.buffer, name, seq_end)
+        Events.span(
+          [:soot_device, :pipeline, :flush],
+          %{stream: name, rows: length(entries)},
+          fn -> do_flush_stream(state, name, stream, entries, rows, seq_start, seq_end) end
+        )
+    end
+  end
 
-            stream = %{stream | backoff_ms: nil, retry_after: nil}
-            {{:ok, length(entries), seq_end}, %{state | streams: Map.put(state.streams, name, stream)}}
+  defp do_flush_stream(state, name, stream, entries, rows, seq_start, seq_end) do
+    _ = rows
 
-          {:drop_and_refresh, reason} ->
-            :ok = state.buffer_mod.drop(state.buffer, name, seq_end)
-            invoke_refresh(state)
-            stream = %{stream | backoff_ms: nil, retry_after: nil}
-            {{:dropped, reason}, %{state | streams: Map.put(state.streams, name, stream)}}
+    case encode_and_post(state, stream, rows, seq_start, seq_end) do
+      :ok ->
+        :ok = state.buffer_mod.drop(state.buffer, name, seq_end)
+        stream = %{stream | backoff_ms: nil, retry_after: nil}
+        {{:ok, length(entries), seq_end}, %{state | streams: Map.put(state.streams, name, stream)}}
 
-          {:keep_with_backoff, reason} ->
-            stream = bump_backoff(stream, state)
+      {:drop_and_refresh, reason} ->
+        :ok = state.buffer_mod.drop(state.buffer, name, seq_end)
+        invoke_refresh(state)
+        stream = %{stream | backoff_ms: nil, retry_after: nil}
+        {{:dropped, reason}, %{state | streams: Map.put(state.streams, name, stream)}}
 
-            {{:retry, reason},
-             %{state | streams: Map.put(state.streams, name, stream)}}
-        end
+      {:keep_with_backoff, reason} ->
+        stream = bump_backoff(stream, state)
+        {{:retry, reason}, %{state | streams: Map.put(state.streams, name, stream)}}
     end
   end
 
@@ -340,21 +353,23 @@ defmodule SootDeviceProtocol.Telemetry.Pipeline do
   end
 
   defp bump_backoff(%Stream{backoff_ms: nil} = stream, state) do
-    delay = state.initial_backoff_ms
-
-    %{
-      stream
-      | backoff_ms: delay,
-        retry_after: System.monotonic_time(:millisecond) + delay
-    }
+    base = state.initial_backoff_ms
+    apply_backoff(stream, base, base)
   end
 
   defp bump_backoff(%Stream{backoff_ms: ms} = stream, state) do
-    delay = min(ms * 2, state.max_backoff_ms)
+    base = min(ms * 2, state.max_backoff_ms)
+    apply_backoff(stream, base, base)
+  end
+
+  # Full-jitter exponential: uniformly random in `[0, base]` so a
+  # synchronized fleet doesn't retry in lockstep.
+  defp apply_backoff(stream, base, ceiling) when is_integer(base) and base >= 0 do
+    delay = if base == 0, do: 0, else: :rand.uniform(base + 1) - 1
 
     %{
       stream
-      | backoff_ms: delay,
+      | backoff_ms: ceiling,
         retry_after: System.monotonic_time(:millisecond) + delay
     }
   end

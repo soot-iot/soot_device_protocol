@@ -27,7 +27,7 @@ defmodule SootDeviceProtocol.Enrollment do
   use GenServer
   require Logger
 
-  alias SootDeviceProtocol.{HTTPClient, Storage}
+  alias SootDeviceProtocol.{Backoff, Events, HTTPClient, Storage}
 
   @type state :: :unenrolled | :enrolled
 
@@ -44,7 +44,9 @@ defmodule SootDeviceProtocol.Enrollment do
       :http_client,
       :http_opts,
       :status,
-      :device_id
+      :device_id,
+      :backoff,
+      :retry_timer
     ]
   end
 
@@ -102,6 +104,12 @@ defmodule SootDeviceProtocol.Enrollment do
     storage = Keyword.fetch!(opts, :storage)
     enroll_url = Keyword.fetch!(opts, :enroll_url)
 
+    backoff =
+      Backoff.new(
+        initial: Keyword.get(opts, :initial_backoff_ms, 1_000),
+        max: Keyword.get(opts, :max_backoff_ms, 5 * 60_000)
+      )
+
     state = %State{
       storage: storage,
       enroll_url: enroll_url,
@@ -113,26 +121,15 @@ defmodule SootDeviceProtocol.Enrollment do
       http_client: Keyword.get(opts, :http_client, HTTPClient.HTTPC),
       http_opts: Keyword.get(opts, :http_opts, []),
       status: detect_status(storage),
-      device_id: detect_device_id(storage)
+      device_id: detect_device_id(storage),
+      backoff: backoff
     }
 
     if Keyword.get(opts, :auto_enroll, true) and state.status == :unenrolled do
-      {:ok, state, {:continue, :enroll}}
-    else
-      {:ok, state}
+      send(self(), :try_enroll)
     end
-  end
 
-  @impl true
-  def handle_continue(:enroll, state) do
-    case do_enroll(state) do
-      {:ok, state} ->
-        {:noreply, state}
-
-      {:error, reason} ->
-        Logger.error("soot_device_protocol enrollment failed: #{inspect(reason)}")
-        {:stop, {:enrollment_failed, reason}, state}
-    end
+    {:ok, state}
   end
 
   @impl true
@@ -155,9 +152,32 @@ defmodule SootDeviceProtocol.Enrollment do
     {:reply, read_identity(state.storage), state}
   end
 
+  @impl true
+  def handle_info(:try_enroll, %State{status: :enrolled} = state) do
+    {:noreply, state}
+  end
+
+  def handle_info(:try_enroll, state) do
+    case do_enroll(state) do
+      {:ok, state} ->
+        {:noreply, %{state | backoff: Backoff.reset(state.backoff), retry_timer: nil}}
+
+      {:error, _reason} ->
+        {delay, backoff} = Backoff.next(state.backoff)
+        timer = Process.send_after(self(), :try_enroll, delay)
+        {:noreply, %{state | backoff: backoff, retry_timer: timer}}
+    end
+  end
+
   # ─── enrollment flow ─────────────────────────────────────────────────
 
   defp do_enroll(%State{} = state) do
+    Events.span([:soot_device, :enrollment], %{enroll_url: state.enroll_url}, fn ->
+      run_enroll(state)
+    end)
+  end
+
+  defp run_enroll(%State{} = state) do
     with :ok <- ensure_inputs(state),
          {private, csr_pem} <- generate_csr(state),
          {:ok, response} <- post_enroll(state, csr_pem),
@@ -169,6 +189,10 @@ defmodule SootDeviceProtocol.Enrollment do
          | status: :enrolled,
            device_id: decoded.device_id
        }}
+    else
+      {:error, reason} ->
+        Logger.warning("soot_device_protocol enrollment attempt failed: #{inspect(reason)}")
+        {:error, reason}
     end
   end
 

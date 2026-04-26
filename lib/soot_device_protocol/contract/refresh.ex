@@ -41,7 +41,7 @@ defmodule SootDeviceProtocol.Contract.Refresh do
   use GenServer
   require Logger
 
-  alias SootDeviceProtocol.{HTTPClient, Storage}
+  alias SootDeviceProtocol.{Backoff, Events, HTTPClient, Storage}
   alias SootDeviceProtocol.Contract.Bundle
 
   @default_interval_ms 300_000
@@ -60,7 +60,9 @@ defmodule SootDeviceProtocol.Contract.Refresh do
       :http_opts,
       :timer,
       :current_fingerprint,
-      :current_bundle
+      :current_bundle,
+      :failure_backoff,
+      :jitter_fraction
     ]
   end
 
@@ -107,7 +109,13 @@ defmodule SootDeviceProtocol.Contract.Refresh do
       http_client: Keyword.get(opts, :http_client, HTTPClient.HTTPC),
       http_opts: Keyword.get(opts, :http_opts, []),
       current_fingerprint: fingerprint,
-      current_bundle: bundle
+      current_bundle: bundle,
+      jitter_fraction: Keyword.get(opts, :jitter_fraction, 0.2),
+      failure_backoff:
+        Backoff.new(
+          initial: Keyword.get(opts, :initial_backoff_ms, 1_000),
+          max: Keyword.get(opts, :max_backoff_ms, Keyword.get(opts, :interval_ms, @default_interval_ms))
+        )
     }
 
     if Keyword.get(opts, :auto_refresh, true) do
@@ -120,7 +128,7 @@ defmodule SootDeviceProtocol.Contract.Refresh do
   @impl true
   def handle_call(:refresh, _from, state) do
     {result, state} = do_refresh(state)
-    state = reschedule(state)
+    state = reschedule(state, result)
     {:reply, result, state}
   end
 
@@ -134,60 +142,76 @@ defmodule SootDeviceProtocol.Contract.Refresh do
 
   @impl true
   def handle_cast(:refresh, state) do
-    {_result, state} = do_refresh(state)
-    {:noreply, reschedule(state)}
+    {result, state} = do_refresh(state)
+    {:noreply, reschedule(state, result)}
   end
 
   @impl true
   def handle_info(:refresh_tick, state) do
-    {_result, state} = do_refresh(state)
-    {:noreply, reschedule(state)}
+    {result, state} = do_refresh(state)
+    {:noreply, reschedule(state, result)}
   end
 
   # ─── refresh flow ───────────────────────────────────────────────────
 
   defp do_refresh(%State{} = state) do
-    case fetch_manifest(state) do
-      {:ok, manifest_json} ->
-        case Bundle.parse_manifest(manifest_json) do
-          {:ok, %Bundle{fingerprint: fp}} when fp == state.current_fingerprint ->
-            {{:ok, :unchanged}, state}
+    outcome =
+      Events.span([:soot_device, :contract, :refresh], %{url: state.url}, fn ->
+        attempt_refresh(state)
+      end)
 
-          {:ok, %Bundle{} = bundle} ->
-            apply_bundle(state, bundle)
+    apply_outcome(outcome, state)
+  end
 
-          {:error, _} = err ->
-            log_failure(:parse, err)
-            {err, state}
-        end
+  defp attempt_refresh(%State{} = state) do
+    with {:ok, manifest_json} <- fetch_manifest(state),
+         {:ok, %Bundle{} = bundle} <- Bundle.parse_manifest(manifest_json) do
+      cond do
+        bundle.fingerprint == state.current_fingerprint ->
+          {:ok, :unchanged}
 
+        true ->
+          attempt_apply_bundle(state, bundle)
+      end
+    else
       {:error, _} = err ->
-        log_failure(:manifest_fetch, err)
-        {err, state}
+        log_failure(:fetch_or_parse, err)
+        err
     end
   end
 
-  defp apply_bundle(state, %Bundle{} = bundle) do
+  defp attempt_apply_bundle(state, %Bundle{} = bundle) do
     case fetch_assets(state, bundle) do
       {:ok, bundle} ->
         case Bundle.verify(bundle, state.trust_pems) do
-          :ok ->
-            persist(state.storage, bundle)
-            invoke_on_change(state.on_change, bundle)
-
-            {{:ok, :updated},
-             %{state | current_fingerprint: bundle.fingerprint, current_bundle: bundle}}
-
-          {:error, _} = err ->
-            log_failure(:verify, err)
-            {err, state}
+          :ok -> {:ok, :updated, bundle}
+          {:error, _} = err -> log_failure(:verify, err); err
         end
 
       {:error, _} = err ->
         log_failure(:asset_fetch, err)
-        {err, state}
+        err
     end
   end
+
+  defp apply_outcome({:ok, :unchanged}, state) do
+    {{:ok, :unchanged}, %{state | failure_backoff: Backoff.reset(state.failure_backoff)}}
+  end
+
+  defp apply_outcome({:ok, :updated, %Bundle{} = bundle}, state) do
+    persist(state.storage, bundle)
+    invoke_on_change(state.on_change, bundle)
+
+    {{:ok, :updated},
+     %{
+       state
+       | current_fingerprint: bundle.fingerprint,
+         current_bundle: bundle,
+         failure_backoff: Backoff.reset(state.failure_backoff)
+     }}
+  end
+
+  defp apply_outcome({:error, _} = err, state), do: {err, state}
 
   defp fetch_manifest(state) do
     case http_get(state, state.url) do
@@ -262,10 +286,30 @@ defmodule SootDeviceProtocol.Contract.Refresh do
     end
   end
 
-  defp reschedule(%State{interval_ms: ms} = state) do
+  defp reschedule(%State{} = state, result) do
     cancel_timer(state.timer)
-    timer = Process.send_after(self(), :refresh_tick, ms)
+
+    {delay, state} =
+      case result do
+        {:error, _} ->
+          {ms, backoff} = Backoff.next(state.failure_backoff)
+          {ms, %{state | failure_backoff: backoff}}
+
+        _ ->
+          {jittered(state.interval_ms, state.jitter_fraction), state}
+      end
+
+    timer = Process.send_after(self(), :refresh_tick, delay)
     %{state | timer: timer}
+  end
+
+  # Add full-jitter ±fraction to the configured interval. e.g. with
+  # jitter_fraction = 0.2, the next tick is in [interval * 0.8, interval * 1.2).
+  defp jittered(interval_ms, fraction) when fraction >= 0 and fraction < 1 do
+    spread = trunc(interval_ms * fraction)
+    floor_ms = interval_ms - spread
+    rand_extra = if spread == 0, do: 0, else: :rand.uniform(spread * 2 + 1) - 1
+    max(0, floor_ms + rand_extra)
   end
 
   defp cancel_timer(nil), do: :ok

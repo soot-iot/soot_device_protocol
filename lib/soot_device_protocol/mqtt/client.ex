@@ -22,6 +22,7 @@ defmodule SootDeviceProtocol.MQTT.Client do
   use GenServer
   require Logger
 
+  alias SootDeviceProtocol.Events
   alias SootDeviceProtocol.MQTT.Message
 
   defmodule State do
@@ -81,6 +82,7 @@ defmodule SootDeviceProtocol.MQTT.Client do
 
     case transport_mod.connect(transport_opts, self()) do
       {:ok, transport} ->
+        Events.emit([:soot_device, :mqtt, :connect], %{}, %{transport: transport_mod})
         {:ok, %State{transport_mod: transport_mod, transport: transport}}
 
       {:error, _} = err ->
@@ -90,12 +92,21 @@ defmodule SootDeviceProtocol.MQTT.Client do
 
   @impl true
   def handle_call({:publish, %Message{} = msg}, _from, state) do
-    {:reply, state.transport_mod.publish(state.transport, msg), state}
+    result = state.transport_mod.publish(state.transport, msg)
+
+    Events.emit(
+      [:soot_device, :mqtt, :publish],
+      %{bytes: byte_size(msg.payload)},
+      %{topic: msg.topic, qos: msg.qos, result: result}
+    )
+
+    {:reply, result, state}
   end
 
   def handle_call({:subscribe, filter, qos, handler}, _from, state) do
     case state.transport_mod.subscribe(state.transport, filter, qos) do
       :ok ->
+        Events.emit([:soot_device, :mqtt, :subscribe], %{}, %{filter: filter, qos: qos})
         handlers = put_handler(state.handlers, filter, handler)
         {:reply, :ok, %{state | handlers: handlers}}
 
@@ -107,6 +118,7 @@ defmodule SootDeviceProtocol.MQTT.Client do
   def handle_call({:unsubscribe, filter}, _from, state) do
     case state.transport_mod.unsubscribe(state.transport, filter) do
       :ok ->
+        Events.emit([:soot_device, :mqtt, :unsubscribe], %{}, %{filter: filter})
         handlers = Enum.reject(state.handlers, fn {f, _} -> f == filter end)
         {:reply, :ok, %{state | handlers: handlers}}
 
@@ -117,11 +129,18 @@ defmodule SootDeviceProtocol.MQTT.Client do
 
   @impl true
   def handle_info({:soot_mqtt_msg, %Message{} = msg}, state) do
+    Events.emit(
+      [:soot_device, :mqtt, :inbound],
+      %{bytes: byte_size(msg.payload)},
+      %{topic: msg.topic}
+    )
+
     route(msg, state.handlers)
     {:noreply, state}
   end
 
   def handle_info({:soot_mqtt_disconnect, reason}, state) do
+    Events.emit([:soot_device, :mqtt, :disconnect], %{}, %{reason: reason})
     Logger.warning("soot_device_protocol mqtt transport disconnected: #{inspect(reason)}")
     {:noreply, state}
   end

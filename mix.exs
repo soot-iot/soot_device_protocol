@@ -53,6 +53,7 @@ defmodule SootDeviceProtocol.MixProject do
     [
       {:jason, "~> 1.4"},
       {:x509, "~> 0.8"},
+      {:telemetry, "~> 1.0"},
       # Optional MQTT 5 client; the runtime only loads it via the
       # :emqtt transport, so a device that only uses the test transport
       # (or another implementation) need not pull it in.
