@@ -1,3 +1,4 @@
+if Code.ensure_loaded?(Duxedo.Streams) do
 defmodule SootDeviceProtocol.Telemetry.Buffer.Duxedo do
   @moduledoc """
   `Duxedo`-backed buffer adapter for the telemetry pipeline.
@@ -187,4 +188,5 @@ defmodule SootDeviceProtocol.Telemetry.Buffer.Duxedo do
     :persistent_term.put({__MODULE__, instance, :streams}, MapSet.put(set, name))
     :ok
   end
+end
 end

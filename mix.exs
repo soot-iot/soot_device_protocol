@@ -72,10 +72,6 @@ defmodule SootDeviceProtocol.MixProject do
       # :emqtt transport, so a device that only uses the test transport
       # (or another implementation) need not pull it in.
       {:emqtt, "~> 1.14", optional: true},
-      # Optional Duxedo backend for Telemetry.Buffer. Pulled in only
-      # when the operator wants the production DuckDB+Arrow path; the
-      # default Buffer.Memory has no NIF deps.
-      {:duxedo, path: "../duxedo", optional: true},
       # Required by the SootDeviceProtocol.Test.Ingest fixture, which
       # ships in lib/ so downstream tests (soot_device, end-user
       # device tests) can use it through the path/hex dep.
@@ -90,6 +86,21 @@ defmodule SootDeviceProtocol.MixProject do
       {:ex_doc, "~> 0.34", only: [:dev], runtime: false},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false}
-    ]
+    ] ++ duxedo_dep()
+  end
+
+  # Optional Duxedo backend for Telemetry.Buffer. Pulled in only when
+  # the sibling repo is checked out alongside (developers typically
+  # have it; CI on its own does not). When absent, `Buffer.Duxedo`
+  # remains uncompiled — the default `Buffer.Memory` is what tests
+  # exercise, and Duxedo coverage lives in the duxedo repo's own
+  # suite plus the soot_device_protocol-with-duxedo path that
+  # operators run locally.
+  defp duxedo_dep do
+    if File.dir?("../duxedo") do
+      [{:duxedo, path: "../duxedo", optional: true}]
+    else
+      []
+    end
   end
 end

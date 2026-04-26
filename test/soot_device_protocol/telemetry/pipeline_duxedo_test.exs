@@ -1,3 +1,4 @@
+if Code.ensure_loaded?(Duxedo.Streams) do
 defmodule SootDeviceProtocol.Telemetry.PipelineDuxedoTest do
   use ExUnit.Case, async: false
 
@@ -143,4 +144,5 @@ defmodule SootDeviceProtocol.Telemetry.PipelineDuxedoTest do
 
     {:ok, 1} = Pipeline.write(pipe, "vibration", %{x: 0.1})
   end
+end
 end
