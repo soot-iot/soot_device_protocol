@@ -85,22 +85,11 @@ defmodule SootDeviceProtocol.MixProject do
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.34", only: [:dev], runtime: false},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
-      {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false}
-    ] ++ duxedo_dep()
-  end
-
-  # Optional Duxedo backend for Telemetry.Buffer. Pulled in only when
-  # the sibling repo is checked out alongside (developers typically
-  # have it; CI on its own does not). When absent, `Buffer.Duxedo`
-  # remains uncompiled — the default `Buffer.Memory` is what tests
-  # exercise, and Duxedo coverage lives in the duxedo repo's own
-  # suite plus the soot_device_protocol-with-duxedo path that
-  # operators run locally.
-  defp duxedo_dep do
-    if File.dir?("../duxedo") do
-      [{:duxedo, path: "../duxedo", optional: true}]
-    else
-      []
-    end
+      {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
+      # Optional Duxedo backend for Telemetry.Buffer. Default
+      # `Buffer.Memory` is what tests exercise; `Buffer.Duxedo` only
+      # compiles when an operator opts duxedo into their device app.
+      {:duxedo, github: "soot-iot/duxedo", branch: "main", optional: true}
+    ]
   end
 end
