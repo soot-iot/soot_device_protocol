@@ -43,12 +43,8 @@ jobs:
           restore-keys: |
             plt-${{ runner.os }}-${{ matrix.elixir }}-${{ matrix.otp }}-
 
-      # `mix deps.unlock --check-unused` is intentionally not run: the
-      # project consumes `{:duxedo, path: "../duxedo", optional: true}`
-      # which CI cannot resolve (private sibling repo, no cross-repo
-      # token), so the check would always flag duxedo's transitive
-      # deps as unused. Lock cleanliness is enforced locally instead.
       - run: mix deps.get
+      - run: mix deps.unlock --check-unused
       - run: mix deps.audit
       - run: mix format --check-formatted
       - run: mix compile --warnings-as-errors
