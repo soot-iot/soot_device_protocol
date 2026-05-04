@@ -59,7 +59,10 @@ if Code.ensure_loaded?(Duxedo.Streams) do
     """
     @impl true
     def define(%__MODULE__{instance: instance} = handle, stream, columns) do
-      case Streams.define(to_atom(stream), columns, instance: instance) do
+      # define/3 is the only entry point that creates a stream atom.
+      # Once defined, the atom is in the table and the runtime
+      # callbacks below resolve via String.to_existing_atom/1.
+      case Streams.define(define_atom(stream), columns, instance: instance) do
         :ok ->
           __register_stream__(handle, stream)
           :ok
@@ -163,8 +166,18 @@ if Code.ensure_loaded?(Duxedo.Streams) do
 
     # ─── helpers ────────────────────────────────────────────────────────
 
+    # Runtime path: streams must already be defined, so the atom is
+    # in the table. String.to_existing_atom/1 raises on a typo, which
+    # is what we want — silent atom growth from bundle data is the
+    # bigger risk.
     defp to_atom(name) when is_atom(name), do: name
-    defp to_atom(name) when is_binary(name), do: String.to_atom(name)
+    defp to_atom(name) when is_binary(name), do: String.to_existing_atom(name)
+
+    # define/3 path: this is the one place we accept a never-seen
+    # stream name and pull it into the atom table. Bounded by the
+    # operator's contract bundle (and validated upstream).
+    defp define_atom(name) when is_atom(name), do: name
+    defp define_atom(name) when is_binary(name), do: String.to_atom(name)
 
     defp approx_size(row) do
       row
