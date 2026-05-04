@@ -45,7 +45,9 @@ defmodule SootDeviceProtocol.Test.Ingest do
   def start_link, do: start()
 
   @spec batches(t()) :: [map()]
-  def batches(agent), do: Agent.get(agent, & &1.batches)
+  # Internally we prepend on write to stay O(1); reverse here so
+  # callers see batches oldest-first.
+  def batches(agent), do: Agent.get(agent, &Enum.reverse(&1.batches))
 
   @spec reset(t()) :: :ok
   def reset(agent),
@@ -85,7 +87,7 @@ defmodule SootDeviceProtocol.Test.Ingest do
         timestamp: DateTime.utc_now()
       }
 
-      Map.update!(state, :batches, fn list -> list ++ [entry] end)
+      Map.update!(state, :batches, fn list -> [entry | list] end)
     end)
 
     case stream_response(agent, stream) do
